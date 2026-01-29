@@ -871,7 +871,7 @@ ASN1DERElement tihmstar::img4tool::getPayloadFromIM4P(const ASN1DERElement &im4p
     const char *hypervisorBuf = NULL;
     size_t hypervisorBufSize = 0;
     ASN1DERElement payload = im4p[3];
-    if (decryptIv || decryptKey) {
+    if ((decryptIv && strlen(decryptIv))|| (decryptKey && strlen(decryptKey))) {
 #ifdef HAVE_CRYPTO
         payload = decryptPayload(payload, decryptIv, decryptKey);
         info("payload decrypted");
