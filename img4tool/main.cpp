@@ -280,7 +280,7 @@ int main_r(int argc, const char * argv[]) {
                 fetchKeys = true;
                 break;
             case 'g': //generator
-                bnch = strtoll(optarg, NULL, 16);
+                bnch = strtoull(optarg, NULL, 16);
                 retassure(bnch, "Failed to set generator!");
                 break;
             case 'i':
