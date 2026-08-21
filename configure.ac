@@ -39,12 +39,15 @@ CFLAGS+=" -std=c11"
 # Versioning.
 
 # Checks for libraries.
-OPENSSL_REQUIRES_STR="openssl >= 0.9.8"
-LIBPLIST_REQUIRES_STR="libplist-2.0 >= 2.3.0"
 LIBGENERAL_REQUIRES_STR="libgeneral >= 75"
-PKG_CHECK_MODULES(openssl, $OPENSSL_REQUIRES_STR, have_openssl=yes, have_openssl=no)
-PKG_CHECK_MODULES(libplist, $LIBPLIST_REQUIRES_STR, have_plist=yes, have_plist=no)
+LIBFWKEYFETCH_REQUIRES_STR="libfwkeyfetch >= 1"
+LIBPLIST_REQUIRES_STR="libplist-2.0 >= 2.3.0"
+OPENSSL_REQUIRES_STR="openssl >= 0.9.8"
+
 PKG_CHECK_MODULES(libgeneral, $LIBGENERAL_REQUIRES_STR)
+PKG_CHECK_MODULES(libfwkeyfetch, $LIBFWKEYFETCH_REQUIRES_STR, have_libfwkeyfetch=yes, have_libfwkeyfetch=no)
+PKG_CHECK_MODULES(libplist, $LIBPLIST_REQUIRES_STR, have_plist=yes, have_plist=no)
+PKG_CHECK_MODULES(openssl, $OPENSSL_REQUIRES_STR, have_openssl=yes, have_openssl=no)
 
 AC_SUBST([libgeneral_requires], [$LIBGENERAL_REQUIRES_STR])
 
@@ -53,6 +56,12 @@ AC_ARG_ENABLE([debug],
             [enable debug build(default is no)])],
             [debug_build=true],
             [debug_build=false])
+
+AC_ARG_WITH([libfwkeyfetch],
+            [AS_HELP_STRING([--without-libfwkeyfetch],
+            [do not build with libfwkeyfetch @<:@default=yes (if available)@:>@])],
+            [with_libfwkeyfetch=no],
+            [with_libfwkeyfetch=yes])
 
 AC_ARG_WITH([plist],
             [AS_HELP_STRING([--without-plist],
@@ -71,6 +80,23 @@ AC_ARG_WITH([compression],
             [do not build with bvx2 support @<:@default=yes@:>@])],
             [with_compression=no],
             [with_compression=yes])
+
+if test "x$have_libfwkeyfetch" == "xyes"; then
+  if test "x$with_libfwkeyfetch" == "xyes"; then
+    AC_DEFINE(HAVE_LIBFWKEYFETCH, 1, [Define if you have libfwkeyfetch])
+    AC_SUBST([HEADER_HAVE_LIBFWKEYFETCH], [1])
+    AC_SUBST([libfwkeyfetch_requires], [$LIBFWKEYFETCH_REQUIRES_STR])
+    AC_SUBST(libfwkeyfetch_CFLAGS)
+    AC_SUBST(libfwkeyfetch_LIBS)
+  else
+    echo "*** Note: libfwkeyfetch has been disabled ***"
+    AC_SUBST([HEADER_HAVE_LIBFWKEYFETCH], [0])
+  fi
+else
+  echo "*** Note: libfwkeyfetch is unavailable ***"
+  with_libfwkeyfetch="no"
+  AC_SUBST([HEADER_HAVE_LIBFWKEYFETCH], [0])
+fi
 
 if test "x$with_plist" == "xyes"; then
   if test "x$have_plist" = "xyes"; then
@@ -159,6 +185,7 @@ Configuration for $PACKAGE-$VERSION:
 -------------------------------------------
 
   install prefix ..........: $prefix
+  with libfwkeyfetch ......: $with_libfwkeyfetch
   with plist ..............: $with_plist
   with bvx2 ...............: $with_compression
   crypto backend ..........: $crypto_backend"

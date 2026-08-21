@@ -292,15 +292,21 @@ void tihmstar::img4tool::printRecSequence(const void *buf, size_t size, int inde
             bool haveSubelem = true;
             try {subelem = {elem.payload(),elem.payloadSize()};(void)*subelem.begin();} catch (...) {haveSubelem=false;}
             if (elem.tag().tagNumber == ASN1DERElement::TagOCTET && haveSubelem && subelem.tag().isConstructed) {
-                printRecSequence(subelem.buf(), subelem.size(), indent+1);
-                printf("\n");
-            }else{
+                try{
+                    printRecSequence(subelem.buf(), subelem.size(), indent+1);
+                    printf("\n");
+                }catch (...){
+                    haveSubelem = false;
+                }
+            }
+            if (!haveSubelem){
+                std::string ps = elem.printString();
                 if (indent && !dontIndentNext) {
                     printf("\n");
                     for (int i=0; i<indent*INDENTVALUE; i++) printf(" ");
                 }
                 dontIndentNext = false;
-                elem.print();
+                printf("%s",ps.c_str());
                 if (elem.tag().tagNumber == ASN1DERElement::TagIA5String) {
                     printf(": ");
                     dontIndentNext = true;
@@ -739,7 +745,7 @@ bool tihmstar::img4tool::im4pContainsKBAG(const ASN1DERElement &im4p){
     return false;
 }
 
-std::string tihmstar::img4tool::getKBAG(const ASN1DERElement &im4p, int kbagNum){
+tihmstar::Mem tihmstar::img4tool::getKBAG(const ASN1DERElement &im4p, int kbagNum){
     retassure(isIM4P(im4p), "Arg is not IM4P");
     assure(im4p.tag().isConstructed);
     assure(im4p.tag().tagNumber == ASN1DERElement::TagSEQUENCE);
@@ -757,7 +763,7 @@ std::string tihmstar::img4tool::getKBAG(const ASN1DERElement &im4p, int kbagNum)
     assure(sequence.tag().tagNumber == ASN1DERElement::TagSEQUENCE);
     assure(sequence.tag().tagClass == ASN1DERElement::TagClass::Universal);
 
-    std::string retval;
+    tihmstar::Mem ret;
     for (auto &kbtag : sequence) {
         assure(kbtag.tag().isConstructed);
         assure(kbtag.tag().tagNumber == ASN1DERElement::TagSEQUENCE);
@@ -771,13 +777,16 @@ std::string tihmstar::img4tool::getKBAG(const ASN1DERElement &im4p, int kbagNum)
                     break;
                 case 1:
                     if (curKBAG == kbagNum) {
-                        retval = elem.getStringValue();
+                        auto v = elem.getStringValue();
+                        ret.append(v.data(), v.size());
                     }
                     break;
                 case 2:
                 {
                     if (curKBAG == kbagNum) {
-                        return retval + elem.getStringValue();
+                        auto v = elem.getStringValue();
+                        ret.append(v.data(), v.size());
+                        return ret;
                     }
                     break;
                 }
@@ -862,7 +871,7 @@ ASN1DERElement tihmstar::img4tool::getPayloadFromIM4P(const ASN1DERElement &im4p
     const char *hypervisorBuf = NULL;
     size_t hypervisorBufSize = 0;
     ASN1DERElement payload = im4p[3];
-    if (decryptIv || decryptKey) {
+    if ((decryptIv && strlen(decryptIv))|| (decryptKey && strlen(decryptKey))) {
 #ifdef HAVE_CRYPTO
         payload = decryptPayload(payload, decryptIv, decryptKey);
         info("payload decrypted");
@@ -1378,16 +1387,8 @@ bool tihmstar::img4tool::isIM4MSignatureValid(const ASN1DERElement &im4m){
         ASN1DERElement sig   = im4m[3];
         ASN1DERElement certelem = im4m[4][0];
         
-        /*
-            Certificate signature should be 512
-         */
-        if (sig.size() < 400) {
-            //What is this?
-            ASN1DERElement sigelems{ sig.payload(), sig.payloadSize()};
-            ASN1DERElement e0 = sigelems[0];
-            ASN1DERElement e1 = sigelems[1];
-            reterror("Unkown signing variant");
-        }else{
+//        if (sig.payloadSize() == 256 /*tested (A8)*/ || sig.payloadSize() == 512 /*untested*/)
+        {
 #ifndef HAVE_OPENSSL
             reterror("Compiled without openssl");
 #else
